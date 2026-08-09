@@ -10,8 +10,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import joblib
 import pandas as pd
+from joblib import dump
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -287,7 +287,9 @@ def train_model(
     output = Path(
         model_file or os.getenv("OLIST_MODEL_FILE", "model.pkl")
     )
-    joblib.dump(package, output, compress=3)
+    # Save the fitted pipeline itself, matching sales-dataset-predict. The
+    # Streamlit app only loads this artifact and never trains at launch.
+    dump(model, output)
 
     if verbose:
         print("Dataset Loaded and Cleaned Successfully!")

@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-import joblib
 import pandas as pd
 import streamlit as st
+from joblib import load
 
-from train_model import MODEL_FEATURES, prepare_order_data, train_model
+from train_model import MODEL_FEATURES, prepare_order_data
 
 
 st.set_page_config(page_title="Olist Dashboard", page_icon="🛒", layout="wide")
@@ -22,12 +21,15 @@ def load_data() -> pd.DataFrame:
     return prepare_order_data()
 
 
-@st.cache_resource(show_spinner="Training the late-delivery model...")
-def load_model(_data: pd.DataFrame) -> dict:
-    model_path = Path(os.getenv("OLIST_MODEL_FILE", "model.pkl"))
-    if model_path.exists():
-        return joblib.load(model_path)
-    return train_model(order_data=_data, model_file=model_path, verbose=False)
+@st.cache_resource(show_spinner="Loading the pre-trained model...")
+def load_model():
+    """Load the model created earlier by train_model.py; never train here."""
+    model_path = Path(__file__).resolve().parent / "model.pkl"
+    if not model_path.exists():
+        raise FileNotFoundError(
+            "model.pkl is missing. Run train_model.py before launching Streamlit."
+        )
+    return load(model_path)
 
 
 df = load_data()
@@ -58,7 +60,7 @@ if filtered_df.empty:
 
 if page == "Dashboard":
     with st.expander("Dataset Preview"):
-        st.dataframe(filtered_df.head(100), use_container_width=True)
+        st.dataframe(filtered_df.head(100), width="stretch")
 
     total_revenue = filtered_df["total_sales"].sum()
     total_freight = filtered_df["total_freight"].sum()
@@ -161,8 +163,7 @@ else:
     st.header("🤖 Late-Delivery Prediction")
     st.write("Enter information available when the order is placed.")
 
-    model_package = load_model(df)
-    model = model_package["model"]
+    model = load_model()
 
     col1, col2 = st.columns(2)
     with col1:
@@ -212,11 +213,3 @@ else:
         else:
             st.success(f"Likely On Time ✅ — probability: {1 - late_probability:.2%}")
         st.write(f"Late probability: **{late_probability:.2%}**")
-
-    with st.expander("Model Evaluation"):
-        metrics = model_package["metrics"]
-        metric_columns = st.columns(5)
-        for column, name in zip(
-            metric_columns, ["accuracy", "precision", "recall", "f1", "roc_auc"]
-        ):
-            column.metric(name.replace("_", " ").title(), f"{metrics[name]:.2%}")
