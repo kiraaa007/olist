@@ -1,0 +1,40 @@
+name: Complete local Olist data copy
+
+on:
+  push:
+    paths:
+      - .github/workflows/copy-olist-data.yml
+
+permissions:
+  contents: write
+
+jobs:
+  copy-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the standalone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy the original data folder locally
+        shell: bash
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/kiraaa007/Olist-E-Commerce-Analytics.git \
+            /tmp/olist-data-source
+          git -C /tmp/olist-data-source sparse-checkout set data
+          mkdir -p data
+          cp -a /tmp/olist-data-source/data/. data/
+
+      - name: Commit the complete local data folder
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Complete local Olist data folder"
+          git push origin HEAD:main
