@@ -29,12 +29,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
 
-# Define the remote fallback location and the eight raw Olist source tables.
-DATA_BASE_URL = (
-    "https://raw.githubusercontent.com/kiraaa007/"
-    "Olist-E-Commerce-Analytics/main/data"
-)
-
+# Read every source table from the data folder stored in this repository.
+DATA_DIR = Path(__file__).resolve().parent / "data"
 DATA_FILES = {
     "orders": "olist_orders_dataset.csv",
     "customers": "olist_customers_dataset.csv",
@@ -74,36 +70,17 @@ def _mode_or_unknown(values: pd.Series) -> str:
     return str(sorted(modes.tolist())[0] if not modes.empty else values.iloc[0])
 
 
-# Prefer a configured/local CSV and fall back to the existing Olist data repository.
-def _read_csv(filename: str, data_dir: str | Path | None = None) -> pd.DataFrame:
-    """Read one source table from a local path or the remote data repository."""
-    configured_dir = data_dir or os.getenv("OLIST_DATA_DIR")
-    candidates = []
-    if configured_dir:
-        candidates.append(Path(configured_dir) / filename)
-    candidates.extend(
-        [
-            Path(__file__).resolve().parent / "data" / filename,
-            Path(__file__).resolve().parent.parent
-            / "Olist-E-Commerce-Analytics"
-            / "data"
-            / filename,
-        ]
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return pd.read_csv(candidate)
-    return pd.read_csv(f"{DATA_BASE_URL}/{filename}")
+# Load each CSV directly from this repository's local data folder.
+def _read_csv(filename: str) -> pd.DataFrame:
+    """Read one Olist source table from the repository's data folder."""
+    return pd.read_csv(DATA_DIR / filename)
 
 
 # Clean, join, and aggregate the raw tables into one analytical row per order.
-def prepare_order_data(data_dir: str | Path | None = None) -> pd.DataFrame:
+def prepare_order_data() -> pd.DataFrame:
     """Build one leakage-safe analytical row per delivered order."""
-    # Load all raw tables through the same local-first source strategy.
-    tables = {
-        name: _read_csv(filename, data_dir)
-        for name, filename in DATA_FILES.items()
-    }
+    # Load all raw tables from the local data folder.
+    tables = {name: _read_csv(filename) for name, filename in DATA_FILES.items()}
 
     # Parse order timestamps and retain delivered orders with complete delivery dates.
     orders = tables["orders"].drop_duplicates("order_id").copy()
@@ -259,13 +236,12 @@ def build_model() -> Pipeline:
 # Train once, evaluate on an untouched test set, and persist the fitted pipeline.
 def train_model(
     order_data: pd.DataFrame | None = None,
-    data_dir: str | Path | None = None,
     model_file: str | Path | None = None,
     verbose: bool = True,
 ) -> dict:
     """Train and evaluate the model, save model.pkl, and return its metrics."""
     # Prepare the feature matrix and binary late-delivery target.
-    data = order_data if order_data is not None else prepare_order_data(data_dir)
+    data = order_data if order_data is not None else prepare_order_data()
     X = data[MODEL_FEATURES]
     y = data["is_late"]
 
