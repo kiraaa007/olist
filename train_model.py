@@ -235,13 +235,12 @@ def build_model() -> Pipeline:
 
 # Train once, evaluate on an untouched test set, and persist the fitted pipeline.
 def train_model(
-    order_data: pd.DataFrame | None = None,
     model_file: str | Path | None = None,
     verbose: bool = True,
 ) -> dict:
     """Train and evaluate the model, save model.pkl, and return its metrics."""
-    # Prepare the feature matrix and binary late-delivery target.
-    data = order_data if order_data is not None else prepare_order_data()
+    # Always load the local CSVs, then prepare the feature matrix and target.
+    data = prepare_order_data()
     X = data[MODEL_FEATURES]
     y = data["is_late"]
 
